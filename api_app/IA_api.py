@@ -29,7 +29,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 USE_LOCAL_LLM: bool = os.getenv("USE_LOCAL_LLM", "false").lower() == "true"
-USE_LOCAL_AGENTS: bool = os.getenv("USE_LOCAL_AGENTS", "false").lower() == "true"
 OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 GEMMA_MODEL_NAME_local=os.getenv("GEMMA_MODEL_NAME_local", "qwen2.5-coder:3b")
 GEMMA_MODEL_NAME_cloud=os.getenv("GEMMA_MODEL_NAME_cloud", "gemma-4-31b-it")
@@ -50,8 +49,7 @@ async def lifespan(app: FastAPI):
     global agent_manager
     logger.info("Inicializando RefugeeAgentManager...")
     try:
-        agent_manager = RefugeeAgentManager(
-            is_local_agents=USE_LOCAL_AGENTS,
+        agent_manager = RefugeeAgentManager(            
             model_name_cloud=GEMMA_MODEL_NAME_cloud,
             model_name_local=GEMMA_MODEL_NAME_local,
             is_local=USE_LOCAL_LLM,
@@ -96,17 +94,16 @@ class OllamaModel(BaseModel):
     modified: str
 
 class SystemHealth(BaseModel):
-    status: str                    # "healthy" | "degraded" | "unavailable"
+    status: str                    
     ollama_available: bool
     ollama_host: str
     local_models: list[str]
     google_api_key_set: bool
     agent_manager_ready: bool
-    active_mode: str               # "local" | "cloud"
+    active_mode: str               
 
 class SystemConfig(BaseModel):
-    use_local_agent: bool
-    use_local: bool        # True para Ollama, False para Google Cloud
+    use_local: bool        
     model_name_cloud: Optional[str] = None
     model_name_local: Optional[str] = None
 
@@ -182,7 +179,7 @@ async def health_check():
     if use_local and not ollama_info["available"]:
         status = "unavailable"
     elif use_local and GEMMA_MODEL_NAME_local not in " ".join(ollama_info["models"]):
-        status = "unavailable"
+        status = "unavailable for gemma-4"
     elif not use_local and not google_key_set:
         status = "unavailable"
     else:
@@ -264,12 +261,12 @@ async def query_agent(query: AgentQuery):
 
 @app.get("/trajectory")
 async def get_trace():
-    """Trazas de razonamiento de los agentes — útil para el panel de auditoría del dashboard."""
+    """Trazas de razonamiento del llm — útil para un panel de auditoría del dashboard."""
     return tracing_plugin.get_stats()
 
 @app.get("/logs")
 async def get_logs(lineas: Optional[int] = 50):
-    """Últimas N líneas del log — para depuración en el dashboard."""
+    """Últimas N líneas del log — para depuración via web"""
     log_path = Path("common") / "data" / "logs" / "logs.log"
     if not log_path.exists():
         raise HTTPException(status_code=404, detail="Archivo de log no encontrado.")
@@ -297,15 +294,14 @@ async def toggle_model_mode(config: SystemConfig):
         )
 
     try:
-        agent_manager.update_provider(
-            is_local_agents=config.use_local_agent,
+        agent_manager.update_provider(            
             is_local=config.use_local,
             model_name_cloud=config.model_name_cloud,
             model_name_local=config.model_name_local
         )
         logger.info(f"Actualización exitosa a modo local: {str(config.use_local)} y modelo local {config.model_name_cloud} y cloud {config.model_name_local}")
-        runtime_config.use_local_llm = config.use_local_agent
-        return {"status": "success", "mode_agent": "local" if config.use_local_agent else "cloud", "mode_orc": "local" if config.use_local else "cloud"}
+        runtime_config.use_local_llm = config.use_local
+        return {"status": "success", "mode_agent": "local" if config.use_local else "cloud", "mode_orc": "local" if config.use_local else "cloud"}
     except Exception as e:
         logger.error(f"Error crítico en el cambio de configuración de agentes: {e}")
         raise HTTPException(status_code=500, detail="Error al reconfigurar agentes.")
@@ -318,7 +314,6 @@ async def get_map_resources(
     """
     Endpoint directo a BD para el mapa del dashboard.
     NO pasa por los agentes LLM — es una consulta directa a SQLite.
-    El dashboard lo llama al cargar y cuando el usuario filtra por categoría.
     """
     try:
         from common.utils.tools import get_map_resources as _get_map_resources

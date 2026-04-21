@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 from pathlib import Path
+import json
 
 from .logger import setup_logger
 
@@ -27,28 +28,30 @@ def _get_connection():
     return conn
 
 
-def get_services_by_category(category: str, city: str = "Valencia") -> list[dict]:
+def get_services_by_category(category: str, city: str = "Valencia") -> str:
     """
-    Retrieves organizations providing a specific type of service within a city.
-    
-    This function acts as a core tool for the 'Needs Specialist Agent' (Google ADK),
-    allowing the Gemma 4 model to query the SQLite database for real-world 
-    resources based on the user's identified needs.
+    Find organizations that provide specific services in a Spanish city.
+
+    This tool queries the SQLite database. Search terms.
+
+    MUST be in SPANISH exactly as they appear in the database.    
 
     Args:
-        category (str): The service category to search for. 
-                        Valid values: 'Legal', 'Health', 'Housing', 'Food', 'Employment'.
+        category (str): The service category to search for (Always spanish).
+                        Valid values: 'Legal', 'Salud', 'Alojamiento', 'Comida', 'Empleo'.
         city (str): The city name to filter results. Defaults to "Valencia".
 
     Returns:
-        list[dict]: A list of dictionaries containing organization details, 
+        str: A list of dictionaries converted to string, containing organization details, 
                     services, requirements, and contact info. Returns a 
                     list with an 'error' or 'info' key if no data is found 
                     or an exception occurs.
     """
     if category not in VALID_CATEGORIES:
         logger.error(f"Categoría '{category}' no válida.")
-        return [{"error": f"Invalid category '{category}'. Supported: {', '.join(VALID_CATEGORIES)}"}]
+        return json.dumps([{
+            "error": f"Invalid category '{category}'. Supported: {', '.join(VALID_CATEGORIES)}"
+        }], ensure_ascii=False)
 
     try:
         conn = _get_connection()
@@ -59,7 +62,8 @@ def get_services_by_category(category: str, city: str = "Valencia") -> list[dict
                 s.category      AS categoria,
                 b.address       AS direccion,
                 b.local_phone   AS telefono,
-                bs.requirements AS requisitos
+                bs.requirements AS requisitos,
+                bs.notes        AS notas
             FROM branches b
             JOIN organizations o ON b.organization_id = o.id
             JOIN branch_services bs ON b.id = bs.branch_id
@@ -77,11 +81,15 @@ def get_services_by_category(category: str, city: str = "Valencia") -> list[dict
         lines = []
 
         for _, row in df.iterrows():
-            name = row.get("name", "N/A")
-            address = row.get("address", "N/A")
-            description = row.get("description", "")
+            # Usamos los alias exactos de tu consulta SQL
+            org = row.get("organizacion", "N/A")
+            servicio = row.get("servicio", "N/A")
+            direccion = row.get("direccion", "N/A")
+            telefono = row.get("telefono", "N/A")
+            requisitos = row.get("requisitos", "N/A")
+            notas = row.get("notas", "")
 
-            lines.append(f"{name} | {address} | {description}")
+            lines.append(f"Organización: {org} | Servicio: {servicio} | Dirección: {direccion} | Teléfono: {telefono} | Requisitos: {requisitos} | Notas: {notas}")
 
         return "\n".join(lines)
 
@@ -90,52 +98,7 @@ def get_services_by_category(category: str, city: str = "Valencia") -> list[dict
         return f"error: Error consultando la base de datos: {str(e)}"
 
 
-def get_branch_coordinates(organization_name: str, city: str = "Valencia") -> dict:
-    """Retrieves the geographic coordinates and address of an organization's branch.
-    
-    This tool is utilized by the 'Geolocation Agent' (Google ADK) to provide 
-    spatial data to the Dash Leaflet component, enabling the visualization 
-    of support resources and route calculation on the map.
-
-    Args:
-        organization_name (str): The name (or partial name) of the organization.
-        city (str): The city to search in. Defaults to "Valencia".
-
-    Returns:
-        dict: A dictionary containing 'lat', 'lon', 'address', and 'name'.
-              If no branch is found or an error occurs, returns a dictionary 
-              with an 'error' key.
-    """
-    try:
-        conn = _get_connection()
-        query = """
-            SELECT b.latitude, b.longitude, b.address, o.name
-            FROM branches b
-            JOIN organizations o ON b.organization_id = o.id
-            WHERE o.name LIKE ? AND b.city = ?
-            LIMIT 1
-        """
-        cursor = conn.cursor()
-        cursor.execute(query, (f"%{organization_name}%", city))
-        result = cursor.fetchone()
-        conn.close()
-
-        if result:
-            name = result.get("name", "N/A")
-            address = result.get("address", "N/A")
-            lat = result.get("latitude", "N/A")
-            lon = result.get("longitude", "N/A")
-
-            return f"{name} | {address} | [{lat}, {lon}]"
-
-        return f"LOCATION_NOT_FOUND:{organization_name}:{city}"
-
-    except Exception as e:
-        logger.error(f"Error consultando la base de datos: {e}")
-        return f"DATABASE_ERROR:get_branch_coordinates:{str(e)}"
-
-
-def get_rights(category: str) -> dict[str, list[str]]:
+def get_rights(category: str) -> str:
     """
     Returns rights, legal warnings and emergency contacts for refugees in Spain,
     filtered by service category.
@@ -144,7 +107,7 @@ def get_rights(category: str) -> dict[str, list[str]]:
         category: Service category. Must be one of: Legal, Salud, Alojamiento, Comida, Empleo.
     
     Returns:
-        A dict with keys  and relevant rights and emergency contacts.
+        A dict converted to a string with keys  and relevant rights and emergency contacts.
     """
     RIGHTS_SNIPPETS = {
     "Legal": [
@@ -212,21 +175,17 @@ def get_rights(category: str) -> dict[str, list[str]]:
     ],
     }
     rights = RIGHTS_SNIPPETS.get(category, [])
+    
     emergency = RIGHTS_SNIPPETS.get("_emergencia", [])
 
-    lines = ["⚠️ Conoce tus derechos:"]
-
-    if rights:
-        lines.append(f"\n⚖️ Derechos fundamentales ({category}):")
-        for r in rights[:4]:  # limitar como pide tu prompt
-            lines.append(f"- {r}")
-
-    if emergency:
-        lines.append("\n📞 Contactos de emergencia:")
-        for e in emergency:
-            lines.append(f"- {e}")
-
-    return "\n".join(lines)
+    #bajamos a 3 puntos clave para que el orquestador no se sature con tanta información
+    data_response = {
+        "categoria_consultada": category,
+        "derechos_fundamentales": rights[:3], 
+        "contactos_emergencia": emergency 
+    }
+    
+    return json.dumps(data_response, ensure_ascii=False)
 
 
 

@@ -13,7 +13,7 @@ from common.utils import tools
 
 def test_get_services_by_category():
     """Prueba que la búsqueda de servicios devuelva los campos correctos"""
-    results = tools.get_services_by_category('Comida', 'Valencia')
+    results = tools.get_services_by_category('Legal', 'Valencia')
     
     print(results)  # Para depuración, muestra los resultados obtenidos
     assert len(results) > 0 
@@ -30,3 +30,7 @@ def test_service_not_found():
     """Prueba el comportamiento cuando no hay resultados"""
     results = tools.get_services_by_category('Comida', 'Madrid')
     assert len(results) == 0
+
+if __name__ == "__main__":
+    test_get_services_by_category()
+    

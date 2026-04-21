@@ -411,9 +411,8 @@ chat_panel = dbc.Card([
     ]),
 ], style={"height": "72vh", "fontFamily": "'IBM Plex Sans', sans-serif"})
 
-# ---------------------------------------------------------------------------
-# Layout
-# ---------------------------------------------------------------------------
+
+#layout
 app.layout = dbc.Container([
     # Header
     dbc.Row([
@@ -506,15 +505,12 @@ app.layout = dbc.Container([
 
 ], fluid=True, style={"fontFamily": "'IBM Plex Sans', sans-serif"})
 
+#callbacks
 
-# ---------------------------------------------------------------------------
-# Callbacks
-# ---------------------------------------------------------------------------
 @app.callback(
     Output("marker-layer", "children"),
     Output("resource-count", "children"),
     Output("active-category-store", "data"),
-    # Agregamos salidas para los estilos visuales
     Output("filter-btn-all", "color"),
     Output({"type": "filter-btn", "index": dash.ALL}, "color"),
     Input({"type": "filter-btn", "index": dash.ALL}, "n_clicks"),
@@ -540,7 +536,7 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
             except Exception:
                 new_category = None
 
-    # --- Lógica de filtrado ---
+    
     resources = fetch_map_resources_local(category=new_category)
     markers = [build_marker(r) for r in resources]
 
@@ -549,8 +545,6 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
         + (f" · {new_category}" if new_category else " · Todas las categorías")
     )
 
-    # --- Lógica Visual de Botones ---
-    # Color para el botón "Todos"
     all_btn_color = "secondary" if new_category is None else "light"
     
     # Colores para los botones de categoría (dash.ALL devuelve una lista)
@@ -559,7 +553,6 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
         "secondary" if cat == new_category else "light" 
         for cat in ALL_CATEGORIES
     ]
-
     return markers, count_text, new_category, all_btn_color, category_btn_colors
 
 
@@ -714,7 +707,6 @@ def toggle_backend_mode(switch_value, selected_local_model):
         return alert, [], True 
 
     payload = {
-        "use_local_agent": use_local,
         "use_local": use_local,
         "model_name_cloud": DEFAULT_CLOUD_MODEL,
         "model_name_local": selected_local_model,
@@ -726,9 +718,8 @@ def toggle_backend_mode(switch_value, selected_local_model):
         
         if resp.status_code == 200:
             logger.info(f"Backend toggled to {'Local' if use_local else 'Cloud'}")
-            return None, switch_value, True # Limpiamos warning y confirmamos cambio
+            return None, switch_value, True         
         
-        # 2. MANEJO DE ERROR 503 (Ollama caído o error de backend)
         elif resp.status_code == 503:
             error_detail = resp.json().get("detail", "Local backend unreachable.")
             error_alert = dbc.Alert(
@@ -741,7 +732,7 @@ def toggle_backend_mode(switch_value, selected_local_model):
     except Exception as e:
         logger.error(f"Critical connection error: {e}")
         error_alert = dbc.Alert(
-            "🚀 API Server is offline. Check your Docker containers.",
+            "🚀 API Server is offline",
             color="danger"
         )
         return error_alert, [], True
