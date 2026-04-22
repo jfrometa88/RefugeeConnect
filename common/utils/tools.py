@@ -166,12 +166,12 @@ def get_rights(category: str) -> str:
     ],
 
     "_emergencia": [
-        "🆘 EMERGENCIAS: 112 (gratuito, intérprete disponible, funciona sin tarjeta SIM)",
-        "🟣 VIOLENCIA DE GÉNERO: 016 (gratuito, no aparece en la factura del teléfono)",
-        "⚖️ DEFENSOR DEL PUEBLO: 900 101 025 (gratuito, quejas contra la administración)",
-        "🔵 ACNUR ESPAÑA: +34 91 556 3614",
-        "🔴 CRUZ ROJA: 900 22 11 22 (gratuito)",
-        "🟡 CÁRITAS: consulta delegación local en caritas.es",
+        "EMERGENCIAS: 112 (gratuito, intérprete disponible, funciona sin tarjeta SIM)",
+        "VIOLENCIA DE GÉNERO: 016 (gratuito, no aparece en la factura del teléfono)",
+        "DEFENSOR DEL PUEBLO: 900 101 025 (gratuito, quejas contra la administración)",
+        "ACNUR ESPAÑA: +34 91 556 3614",
+        "CRUZ ROJA: 900 22 11 22 (gratuito)",
+        "CÁRITAS: consulta delegación local en caritas.es",
     ],
     }
     rights = RIGHTS_SNIPPETS.get(category, [])

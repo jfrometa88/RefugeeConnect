@@ -56,7 +56,7 @@ def orchestrator_setup(
             "    YOUR RESPONSE ENDS HERE.\n"
             "  Step 3b. If result contains organizations:\n"    
             "    Call get_rights with the category.\n"
-            "    Compose a single response in Markdown with three sections:\n"
+            "    Compose a single response in plain text with three sections:\n"
             "      1. Organizations found with addresses and other data.\n"
             "      2. A short rights and warnings section from get_rights (3-4 points).\n"
             "      3. Emergency contacts.\n"

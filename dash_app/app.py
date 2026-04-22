@@ -584,7 +584,7 @@ def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
         resp = requests.post(
             f"{API_BASE}/query",
             json={"message": user_text, "session_id": session_id,"user_id": "anonymous_user"},
-            timeout=90,
+            timeout=180,
         )
         resp.raise_for_status()
         logger.warning("Sin respuesta del asistente.")
@@ -702,9 +702,6 @@ def toggle_backend_mode(switch_value, selected_local_model):
             dismissable=True
         )
         return warning_msg, [], True
-    
-    if use_local and alert is not None:
-        return alert, [], True 
 
     payload = {
         "use_local": use_local,
@@ -718,7 +715,10 @@ def toggle_backend_mode(switch_value, selected_local_model):
         
         if resp.status_code == 200:
             logger.info(f"Backend toggled to {'Local' if use_local else 'Cloud'}")
-            return None, switch_value, True         
+            if alert is not None:
+                return alert, switch_value, True
+            else:
+                return None, switch_value, True
         
         elif resp.status_code == 503:
             error_detail = resp.json().get("detail", "Local backend unreachable.")
