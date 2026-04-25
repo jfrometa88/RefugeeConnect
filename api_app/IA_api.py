@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
         logger.info("AgentManager listo.")
     except Exception as e:
         logger.error(f"Error al inicializar AgentManager: {e}", exc_info=True)
-        # No relanzamos
+        # no relanzamos
     yield
     logger.info("Apagando RefugeeConnect API.")
 
@@ -103,7 +103,7 @@ class SystemHealth(BaseModel):
     active_mode: str               
 
 class SystemConfig(BaseModel):
-    use_local: bool        
+    use_local: bool
     model_name_cloud: Optional[str] = None
     model_name_local: Optional[str] = None
 
@@ -261,7 +261,7 @@ async def query_agent(query: AgentQuery):
 
 @app.get("/trajectory")
 async def get_trace():
-    """Trazas de razonamiento del llm — útil para un panel de auditoría del dashboard."""
+    """Trazas de razonamiento del llm — útil para auditoría."""
     return tracing_plugin.get_stats()
 
 @app.get("/logs")
@@ -294,7 +294,7 @@ async def toggle_model_mode(config: SystemConfig):
         )
 
     try:
-        agent_manager.update_provider(            
+        agent_manager.update_provider(
             is_local=config.use_local,
             model_name_cloud=config.model_name_cloud,
             model_name_local=config.model_name_local

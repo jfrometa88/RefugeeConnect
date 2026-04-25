@@ -10,9 +10,9 @@ logger = setup_logger('api.agents.agent')
 def orchestrator_setup(
     is_local: bool,
     model_name_cloud: str,
-    model_name_local: str    
+    model_name_local: str
 ) -> LlmAgent:
-
+    """Configura el agente orquestador con su modelo, instrucciones y herramientas."""
     return LlmAgent(
         name="refugee_connect_orchestrator",
         model=get_model_instance(

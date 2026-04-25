@@ -6,9 +6,8 @@ from google.adk.plugins.base_plugin import BasePlugin
 
 class MinimalTracingPlugin(BasePlugin):
     """
-    Minimal tracing plugin for RefugeeConnect AI.
-    Logs agent and Gemma 4 invocations to ensure observability in the 
-    multi-agent architecture.
+    Tracing plugin mínimo para agentes y solicitudes LLM en el Orchestrator.
+    Proporciona trazabilidad básica de invocaciones de agentes y solicitudes LLM.
     """
 
     def __init__(self) -> None:
@@ -21,11 +20,10 @@ class MinimalTracingPlugin(BasePlugin):
         self, agent: BaseAgent, context: CallbackContext
     ) -> None:
         """
-        Triggered before an agent starts processing.
-        Standardizes 'before_agent_run' instead of 'callback' nomenclature.
+        Se activa antes de que un agente ejecute su lógica. Proporciona trazabilidad de invocaciones de agentes.
         """
         self.agent_count += 1
-        # In ADK, metadata is often inside context.metadata
+        
         session_id = context.metadata.get('session_id', 'unknown') if context.metadata else 'unknown'
         
         self.logger.info(
@@ -37,13 +35,11 @@ class MinimalTracingPlugin(BasePlugin):
         self, llm_request: LlmRequest, context: CallbackContext
     ) -> None:
         """
-        Triggered before a request is sent to Gemma 4 (via Ollama or API).
-        Standardizes 'before_llm_run' nomenclature.
+        Se dispara antes de que se ejecute una solicitud LLM. Proporciona trazabilidad de solicitudes LLM.
         """
         self.llm_count += 1
         model_name = getattr(llm_request, 'model', 'Gemma-4')
         
-        # Log the first prompt message for better debugging of the Orchestrator's plan
         last_msg = ""
         if llm_request.messages:
             last_msg = llm_request.messages[-1].content[:50] + "..."
@@ -54,12 +50,12 @@ class MinimalTracingPlugin(BasePlugin):
         )
 
     def get_stats(self) -> dict:
-        """Returns session statistics for the Dashboard."""
+        """Devuelve estadísticas básicas sobre las invocaciones de agentes y solicitudes LLM."""
         return {
             "agent_invocations": self.agent_count,
             "llm_requests": self.llm_count,
             "status": "active"
         }
 
-# Global instance for the FastAPI app
+# Para usar en la API
 tracing_plugin = MinimalTracingPlugin()

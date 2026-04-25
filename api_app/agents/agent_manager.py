@@ -18,39 +18,38 @@ class RefugeeAgentManager:
                  is_local:bool,
                  session_id:str,
                  existing_session_service=None):
-        #si recibimos un servicio de sesiones previo, lo mantenemos para no borrar el chat
         self.session_id = session_id
         self.session_service = existing_session_service or InMemorySessionService()
         
-        #guardamos la configuración actual por si necesitamos consultarla
-        self.config_state = {            
+        # guardamos el estado de configuración para futuras recargas
+        self.config_state = {
             "model_name_cloud": model_name_cloud,
             "model_name_local": model_name_local,
             "is_local": is_local
         }
-        #iniciamos el orquestador
+        # inicializamos el orquestador y el runner
         self.orchestrator = orchestrator_setup(is_local,model_name_cloud,model_name_local) 
         self.APP_NAME = "refugee_connect"
         
-        #runner es el motor que ejecuta el flujo del orquestador
+        
         self.runner = Runner(
             agent=self.orchestrator,
             app_name=self.APP_NAME, 
             session_service=self.session_service,
             plugins=[tracing_plugin]
         )
-        #marcamos como inicializado
+        
         self._initialized = True
 
     async def _get_or_create_session(self, user_id: str, session_id: str):
         """Obtiene o crea una sesión para el usuario."""
-        #se obtiene la sesión si existe
+        # primero intentamos obtener la sesión existente
         session = await self.session_service.get_session(
             app_name=self.APP_NAME,
             user_id=user_id,
             session_id=session_id
         )
-        #si no existe la creamos
+        # si no existe, la creamos
         if not session:
             session = await self.session_service.create_session(
                 app_name=self.APP_NAME,
@@ -67,7 +66,7 @@ class RefugeeAgentManager:
     ) -> str:
         """Envía la consulta al orquestador y retorna la respuesta final."""
 
-        #si no existe un sesion_id activa la creamos
+        # si no se proporciona session_id, usamos un formato por defecto basado en user_id
         if session_id is None:
             session_id = f"session_{user_id}"
 
@@ -87,7 +86,7 @@ class RefugeeAgentManager:
                 session_id=session.id,
                 new_message=query_content
             ):
-                # Identificar quién está generando el evento
+                # Traza detallada de eventos para depuración y análisis
                 autor = getattr(event, "author", "unknown")
                 content = getattr(event, "content", None)
                 
@@ -147,29 +146,26 @@ class RefugeeAgentManager:
                         model_name_local: Optional[str]
                         ):
         """
-        Realiza el cambio del motor de inferencia entre modelos locales o en cloud y reconstruye el orquestador.
+        Realiza el cambio del motor de inferencia entre modelos locales o cloud y reconstruye el orquestador.
         """
         logger.info(f"🔄 Iniciando recarga de proveedor: Local={is_local}, Modelo cloud={model_name_cloud}, Modelo local={model_name_local}")
         
         try:
-            new_orchestrator = orchestrator_setup(                
+            new_orchestrator = orchestrator_setup(
                 model_name_cloud=model_name_cloud if model_name_cloud else self.config_state["model_name_cloud"],
                 model_name_local=model_name_local if model_name_local else self.config_state["model_name_local"],
                 is_local=is_local
             )
-            
-            # reemplazamos el orquestador
+            # actualizamos el orquestador en el manager
             self.orchestrator = new_orchestrator
             
-            # reiniciamos el runner para persistir la memoria
             self.runner = Runner(
                 agent=self.orchestrator, 
                 app_name=self.APP_NAME, 
                 session_service=self.session_service,
                 plugins=[tracing_plugin]
             )
-            
-            # actualizamos el estado interno de configuración
+            # actualizamos el estado de configuración para futuras recargas
             self.config_state["is_local"] = is_local
             self.config_state["model_name_cloud"] = model_name_cloud
             self.config_state["model_name_local"] = model_name_local

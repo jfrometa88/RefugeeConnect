@@ -27,7 +27,6 @@ if str(project_root) not in sys.path:
 from common.utils.logger import setup_logger
 logger = setup_logger('dash_app')
 
-# Localizar y cargar las traducciones
 translations_path = Path(__file__).parent / "TRANSLATIONS.json"
 
 try:
@@ -40,9 +39,6 @@ except Exception as e:
     TRANSLATIONS = {"es": {"title": "RefugeeConnect AI", "subtitle": "Error al cargar traducciones"}}
 
 DB_PATH = project_root / "common" / "data" / "refugeeconnect.db"
-
-#configuración
-
 API_BASE = os.getenv("API_URL", "http://localhost:8000")
 SESSION_ID = str(uuid.uuid4())
 
@@ -181,7 +177,7 @@ def check_gemma4_in_ollama(health: dict) -> dbc.Alert | None:
     gemma4_present = any(gemma4_base in m or "gemma4" in m or "gemma-4" in m for m in local_models)
  
     if gemma4_present:
-        return None  # todo bien, no mostrar nada
+        return None
  
     return dbc.Alert(
         [
@@ -234,6 +230,7 @@ def build_marker(resource: dict) -> dl.CircleMarker:
     )
 
 def make_bubble(text: str, role: str) -> dbc.Card:
+    """Crea un mensaje de chat con estilo de burbuja"""
     is_user = role == "user"
     return dbc.Card(
         dbc.CardBody(text, style={"padding": "8px 14px", "fontSize": "0.9em", "whiteSpace": "pre-wrap"}),
@@ -250,12 +247,10 @@ def make_bubble(text: str, role: str) -> dbc.Card:
     )
 
 #carga inicial de datos
-
 initial_resources = fetch_map_resources_local()
 initial_health = fetch_system_health()
 
 #App
-
 app = dash.Dash(
     __name__,
     external_stylesheets=[
@@ -323,7 +318,7 @@ filter_panel = dbc.Card([
                 )
                 for cat in ALL_CATEGORIES
             ] + [
-                dbc.Button("Todos/الجميع/Tous", id="filter-btn-all", color="secondary", size="sm", className="mb-1")
+                dbc.Button("Todos/All/الجميع/Tous", id="filter-btn-all", color="secondary", size="sm", className="mb-1")
             ],
             vertical=True,
             style={"width": "100%"},
@@ -335,7 +330,7 @@ filter_panel = dbc.Card([
 ], style={"height": "100%"})
 
 
-
+#Chat
 chat_panel = dbc.Card([
     dbc.CardHeader([
         html.I(className="fa-solid fa-robot me-2"),
@@ -382,16 +377,22 @@ chat_panel = dbc.Card([
             },
             children=[
                 make_bubble(
-                    "Hola 👋 Puedo ayudarte a encontrar recursos en Valencia: alojamiento, comida, atención legal, salud y empleo. ¿Qué necesitas?",
+                    "Hola/Hello/مرحبا/Bonjour 👋",
                     "bot"
                 )
             ]
+        ),
+        html.Div(
+            id="chat-status-bar",
+            children = "Puedo ayudarte ¿Qué necesitas?/I can help you. What do you need?/يمكنني مساعدتك. ماذا تحتاج؟/Je peux vous aider. De quoi avez-vous besoin?",
+            style={"minHeight": "24px", "padding": "2px 4px"},
+            
         ),
         html.Hr(style={"margin": "8px 0"}),
         dbc.InputGroup([
             dbc.Input(
                 id="user-input",
-                placeholder="Escribe en tu idioma... | اكتب بلغتك...",
+                placeholder="Escribe en tu idioma ...",
                 type="text",
                 style={"fontFamily": "'IBM Plex Sans', sans-serif"},
             ),
@@ -465,7 +466,7 @@ app.layout = dbc.Container([
         ], width=4)
     ], className="mt-3 mb-3 pb-2 border-bottom"),
     html.Div(id="gemma4-warning-container"),
-    # Cuerpo principal
+    #cuerpo principal
     dbc.Row([
         # Columna izquierda: filtros + chat
         dbc.Col([
@@ -481,7 +482,7 @@ app.layout = dbc.Container([
         dbc.Col(map_component, width=8),
     ]),
 
-    # Modal de estado del sistema
+    # modal de estado del sistema
     dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle("Estado del sistema")),
         dbc.ModalBody(id="health-modal-body"),
@@ -520,6 +521,7 @@ app.layout = dbc.Container([
     prevent_initial_call=False,
 )
 def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_category):
+    """Actualiza los marcadores del mapa según la categoría seleccionada."""
     ctx = dash.callback_context
     new_category = active_category
 
@@ -546,9 +548,7 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
     )
 
     all_btn_color = "secondary" if new_category is None else "light"
-    
-    # Colores para los botones de categoría (dash.ALL devuelve una lista)
-    # Deben estar en el mismo orden que ALL_CATEGORIES definido en tu layout
+
     category_btn_colors = [
         "secondary" if cat == new_category else "light" 
         for cat in ALL_CATEGORIES
@@ -559,12 +559,26 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
 @app.callback(
     Output("chat-history", "children"),
     Output("user-input", "value"),
-    Output("loading-indicator", "children"),
     Input("send-btn", "n_clicks"),
     Input("user-input", "n_submit"),
     State("user-input", "value"),
     State("chat-history", "children"),
     State("session-store", "data"),
+    running=[
+        (Output("send-btn", "disabled"), True, False),
+        (Output("user-input", "disabled"), True, False),
+        (Output("chat-status-bar", "children"),
+            # Mientras corre → spinner visible
+            dbc.Spinner(
+                html.Span(" El asistente está pensando...",
+                          style={"fontSize": "0.82em", "color": "#888", "verticalAlign": "middle"}),
+                size="sm", color="primary", type="border",
+                spinner_style={"marginRight": "6px", "verticalAlign": "middle"},
+            ),
+            "",
+        ),
+    ],
+    allow_duplicate=True,
     prevent_initial_call=True,
 )
 def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
@@ -578,30 +592,28 @@ def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
             chat_history = [chat_history]
         else:
             chat_history = []
-
+    
     try:
-        session_id=session_id
         resp = requests.post(
             f"{API_BASE}/query",
-            json={"message": user_text, "session_id": session_id,"user_id": "anonymous_user"},
+            json={"message": user_text, "session_id": session_id, "user_id": "anonymous_user"},
             timeout=180,
         )
         resp.raise_for_status()
-        logger.warning("Sin respuesta del asistente.")
         bot_text = resp.json().get("response", "Sin respuesta del asistente.")
     except requests.Timeout:
         logger.warning("El asistente tardó demasiado en responder.")
         bot_text = "⏱ El asistente tardó demasiado en responder. Inténtalo de nuevo."
     except requests.ConnectionError:
         logger.warning("No se puede conectar con el servidor.")
-        bot_text = "🔌 No se puede conectar con el servidor. ¿Está corriendo la API en el puerto 8000?"
+        bot_text = "🔌 No se puede conectar con el servidor. ¿Está corriendo la API?"
     except Exception as e:
         logger.warning(f"Error inesperado: {str(e)}")
         bot_text = f"❌ Error inesperado: {str(e)}"
 
     new_history = [make_bubble(bot_text, "bot"), make_bubble(user_text, "user")] + chat_history
 
-    return new_history, "", ""
+    return new_history, ""
 
 
 @app.callback(
@@ -613,7 +625,7 @@ def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
     prevent_initial_call=True,
 )
 def toggle_health_modal(n_clicks, is_open_modal):
-    """Abre/cierra el modal de estado del sistema y muestra el health check."""
+    """Abre/cierra el modal de estado del sistema y muestra el health check. Además actualiza el dropdown de modelos locales disponibles."""
     if not n_clicks:
         return False, no_update
 
@@ -651,6 +663,8 @@ def toggle_health_modal(n_clicks, is_open_modal):
     Input("session-store", "data")
 )
 def update_status_indicators(n_clicks, session_id):
+    """Actualiza el texto del modelo activo y el badge de estado cada vez que se consulta el health check 
+    o cambia la sesión (por si se reinicia el backend)."""
     health = fetch_system_health()
 
     if health is None or health.get("status")=="unavailable":
@@ -690,6 +704,8 @@ def update_status_indicators(n_clicks, session_id):
     prevent_initial_call=True
 )
 def toggle_backend_mode(switch_value, selected_local_model):
+    """Permite cambiar entre backend local (Ollama) y cloud (Google Gemma 4) 
+    y muestra advertencias si Ollama no está disponible o no tiene Gemma 4."""
     use_local = len(switch_value) > 0
     
     health = fetch_system_health()
@@ -710,12 +726,11 @@ def toggle_backend_mode(switch_value, selected_local_model):
     }
     
     try:
-        # Intentamos la llamada a la API
         resp = requests.post(f"{API_BASE}/config/toggle", json=payload, timeout=15)
         
         if resp.status_code == 200:
             logger.info(f"Backend toggled to {'Local' if use_local else 'Cloud'}")
-            if alert is not None:
+            if alert is not None and use_local:
                 return alert, switch_value, True
             else:
                 return None, switch_value, True
@@ -749,25 +764,26 @@ def toggle_backend_mode(switch_value, selected_local_model):
         Output("IA_title", "children"),
         Output("local_model_display", "children"),
         Output("cloud-model-display", "children"),
-        Output("chat-history","children", allow_duplicate=True),
         Output("llm-switch", "options"),
         Output("user-input", "placeholder"),
         Output("input-placeholder2", "children"),
     ],
     [Input("language-selector", "value")],
+    allow_duplicate=True,
     prevent_initial_call=True
 )
 def update_language(lang):
+    """Actualiza todos los textos configurados como tal de la interfaz según el idioma seleccionado."""
     t = TRANSLATIONS.get(lang, TRANSLATIONS["es"])
     
-    # Mantenemos los formatos
+    # mantenemos los formatos
     title = [html.I(className="fa-solid fa-earth-europe me-2"), t["title"]]
     refresh_map_btn = [html.I(className="fa-solid fa-rotate me-1"), t["refresh-map-btn"]]
     health_btn = [html.I(className="fa-solid fa-heart-pulse me-1"), t["health-btn"]]
     new_options = [{"label": t["llm_switch_label"], "value": 1}]
     
     return [title, t["subtitle"], refresh_map_btn, health_btn,t["head-filter"],t["IA_title"],
-            t["local_model_display"],t["cloud-model-display"],t["chat_welcome"],new_options,
+            t["local_model_display"],t["cloud-model-display"],new_options,
             t["input_placeholder"],t["input_placeholder2"]]
 
 
@@ -777,6 +793,7 @@ def update_language(lang):
     State("chat-history", "style")
 )
 def adjust_chat_direction(lang, current_style):
+    """Ajusta la dirección del texto en el historial del chat según el idioma seleccionado (RTL para árabe)."""
     new_style = current_style.copy()
     if lang == "ar":
         new_style["direction"] = "rtl"

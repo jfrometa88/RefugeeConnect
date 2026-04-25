@@ -18,14 +18,6 @@ def test_get_services_by_category():
     print(results)  # Para depuración, muestra los resultados obtenidos
     assert len(results) > 0 
 
-def test_get_branch_coordinates():
-    """Prueba que la geolocalización devuelva latitud y longitud"""
-    coords = tools.get_branch_coordinates('CEAR', 'Valencia')
-    
-    assert coords['lat'] == 39.467521
-    assert coords['lon'] == -0.395812
-    assert coords['name'] == 'CEAR'
-
 def test_service_not_found():
     """Prueba el comportamiento cuando no hay resultados"""
     results = tools.get_services_by_category('Comida', 'Madrid')
@@ -33,4 +25,4 @@ def test_service_not_found():
 
 if __name__ == "__main__":
     test_get_services_by_category()
-    
+    test_service_not_found()

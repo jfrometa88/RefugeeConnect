@@ -6,14 +6,13 @@ from google.genai import types
 from google.adk.models import Gemini
 from google.adk.models.lite_llm import LiteLlm 
 
-# 1. Configurar Logger
 logger = setup_logger('refugee_ai.config')
 load_dotenv()
 
 GEMMA_MODEL_NAME_local=os.getenv("GEMMA_MODEL_NAME_local", "qwen2.5-coder:3b")
 GEMMA_MODEL_NAME_cloud=os.getenv("GEMMA_MODEL_NAME_cloud", "gemma-4-31b-it")
 
-# 4. Configuración de reintentos (Políticas de resiliencia)
+# configuración de reintentos (Políticas de resiliencia)
 RETRY_CONFIG = types.HttpRetryOptions(
     attempts=4,
     exp_base=2,

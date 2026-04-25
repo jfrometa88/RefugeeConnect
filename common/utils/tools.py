@@ -34,7 +34,7 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
 
     This tool queries the SQLite database. Search terms.
 
-    MUST be in SPANISH exactly as they appear in the database.    
+    MUST be in SPANISH exactly as they appear in the database.
 
     Args:
         category (str): The service category to search for (Always spanish).
@@ -239,7 +239,7 @@ def get_map_resources(city: str = "Valencia", category: str | None = None) -> li
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
-        # Agrupar idiomas por branch id para evitar N+1 queries
+        # agrupar idiomas por branch id para evitar N+1 queries
         branch_ids = list({row["id"] for row in rows})
         languages_map: dict[int, list[str]] = {bid: [] for bid in branch_ids}
 
