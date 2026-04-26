@@ -140,8 +140,8 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 ### Quick Start with Docker
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RefugeeConnectAI.git
-cd RefugeeConnectAI
+git clone https://github.com/jfrometa88/RefugeeConnect.git
+cd RefugeeConnect
 docker-compose up --build
 ```
 
@@ -229,6 +229,7 @@ The concept is extensible in multiple directions:
 - **Dual use** — A tool not just for people in need, but for NGO volunteers who need quick answers when helping others
 - **Data partnerships** — Formal collaboration with organizations to keep the database current and comprehensive
 - **Vector Database Integration (RAG):** Transitioning from pure SQLite queries to a Retrieval-Augmented Generation (RAG) architecture using vector databases to handle complex legal texts more efficiently in resource-constrained environments
+- **User Localization & Route Optimization**: Implementing automated user geolocation (with privacy consent) or manual coordinate input. This will allow the integration of distance optimization algorithms to suggest the most efficient support centers based on the user's real-time position.
 
 ---
 
@@ -249,6 +250,8 @@ This project was built from personal necessity, with a personal computer and per
 
 - **Kaggle:** [@jorgefrometa]
 - **LinkedIn:** [www.linkedin.com/in/jorge-israel-frometa-moya]
+- **HuggingFace Space** [https://jfrometa88-refugeeconnect-ai-dashboard.hf.space/]
+- **Youtube** [https://youtu.be/bGfg34VjevE]
 
 ---
 
