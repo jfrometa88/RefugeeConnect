@@ -44,8 +44,8 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  User Interface (Dash)               │
-│           Multilingual: ES | EN | AR | FR            │
+│                  User Interface (Dash)              │
+│           Multilingual: ES | EN | AR | FR           │
 └──────────────────┬──────────────────────────────────┘
                    │
        ┌───────────┴───────────┐
@@ -82,7 +82,7 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 - **Safe Tool Design** — Tools return standardized strings (e.g., `NO_RECORDS`) to prevent hallucination loops in smaller local models
 - **Resilient by Design** — The map interface works independently of the LLM; users always get *something* useful
 - **Dual-Use Potential** — Useful not just for migrants, but also for NGO volunteers who need quick guidance themselves
-
+- **Improved Responsiveness**: Input Blocking: The text input and send button are automatically disabled during AI processing using Dash's running parameter to prevent duplicate messages. Added a chat-status-bar with an "Assistant is thinking..." text to provide clear feedback during latency.
 ---
 
 ## 🏗️ Technology Stack
@@ -123,6 +123,8 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 - State-based reasoning prevents ambiguous or looping responses
 - Tools return normalized strings, not raw objects
 - The map bypasses the LLM entirely for resilience and speed
+- Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
+- State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
 
 ---
 
@@ -210,6 +212,9 @@ This project is a **functional proof of concept**, not a finished product. These
 - **Database coverage:** A representative sample of local NGOs — not exhaustive
 - **Translation:** The AI translates responses dynamically, but static dashboard labels returned from database are not yet translated (a known technical debt)
 - **Local model testing:** Hardware limitations prevented testing with Gemma 4 locally; development used `qwen` as a proxy model via Ollama
+- **Session Management:** Currently lacks adequate session handling; interactions are treated in a volatile context suitable for demo purposes
+- **Memory Optimization:** Relies on InMemoryService for session memory, which carries risks of data loss and high RAM consumption under load
+- **Flow Optimization:** Further testing is required to optimize how the system handles deep LLM data flow errors to prevent frontend freezes during catastrophic API failures
 
 The goal is to demonstrate **viability and impact** — to show what's possible, and invite the organizations, institutions, and developers who have the resources to take it further.
 
@@ -223,6 +228,7 @@ The concept is extensible in multiple directions:
 - **Population scope** — The same architecture serves homeless individuals, people with addictions, elderly without support, and children at risk (most NGOs already serve these groups)
 - **Dual use** — A tool not just for people in need, but for NGO volunteers who need quick answers when helping others
 - **Data partnerships** — Formal collaboration with organizations to keep the database current and comprehensive
+- **Vector Database Integration (RAG):** Transitioning from pure SQLite queries to a Retrieval-Augmented Generation (RAG) architecture using vector databases to handle complex legal texts more efficiently in resource-constrained environments
 
 ---
 
@@ -241,8 +247,8 @@ This project is submitted to the **Gemma 4 Good Hackathon** under:
 
 This project was built from personal necessity, with a personal computer and personal experience. It is submitted with the hope that it reaches people who can give it the resources it deserves.
 
-- **Kaggle:** [@YOUR_KAGGLE_USER]
-- **LinkedIn:** [Your Profile]
+- **Kaggle:** [@jorgefrometa]
+- **LinkedIn:** [www.linkedin.com/in/jorge-israel-frometa-moya]
 
 ---
 
