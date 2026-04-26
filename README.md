@@ -258,9 +258,3 @@ This project was built from personal necessity, with a personal computer and per
 - **Google** — for the Agent Development Kit (ADK)
 - **Cruz Roja, Cáritas, ACCEM, and all NGOs in Spain** — for the work they do every day under difficult conditions.
 - **Everyone who shared their story** — the people I met navigating the same system, whose experiences shaped every design decision here
-
----
-
-## 📄 License
-
-[MIT License](LICENSE)
