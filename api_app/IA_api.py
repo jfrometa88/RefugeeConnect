@@ -1,4 +1,5 @@
 import sys
+from httpcore import request
 import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -82,6 +83,7 @@ class AgentQuery(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
     user_id: str = Field(default="anonymous_user")
+    user_position: Optional[list[float]] = None
 
 class AgentResponse(BaseModel):
     response: str
@@ -100,7 +102,7 @@ class SystemHealth(BaseModel):
     local_models: list[str]
     google_api_key_set: bool
     agent_manager_ready: bool
-    active_mode: str               
+    active_mode: str
 
 class SystemConfig(BaseModel):
     use_local: bool
@@ -238,8 +240,14 @@ async def query_agent(query: AgentQuery):
     try:
         logger.info(f"Consulta [user={query.user_id}, session={query.session_id}]: {query.message[:80]}")
 
+        if query.user_position and len(query.user_position) == 2:
+            lat, lon = query.user_position
+            message = f"USER_POSITION:[{lat},{lon}] {query.message}"
+        else:
+            message = query.message
+
         response = await agent_manager.query_orchestrator(
-            user_message=query.message,
+            user_message=message,
             user_id=query.user_id,
             session_id=query.session_id,
         )

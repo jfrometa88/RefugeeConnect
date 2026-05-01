@@ -2,12 +2,16 @@ import sqlite3
 import pandas as pd
 from pathlib import Path
 import json
+import requests as _requests
+
 
 from .logger import setup_logger
 
 logger = setup_logger('tools')
 
 DB_PATH = Path(__file__).resolve().parents[2] / "common" / "data" / "refugeeconnect.db"
+
+_OSRM_BASE = "http://router.project-osrm.org/route/v1/driving/"
 
 # Colores por categoría — compartidos con el frontend para coherencia visual
 CATEGORY_COLORS = {
@@ -57,6 +61,7 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
         conn = _get_connection()
         query = """
             SELECT
+                b.id            AS id,
                 o.name          AS organizacion,
                 s.name          AS servicio,
                 s.category      AS categoria,
@@ -81,7 +86,7 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
         lines = []
 
         for _, row in df.iterrows():
-            # Usamos los alias exactos de tu consulta SQL
+            id_val = row.get("id", "N/A")
             org = row.get("organizacion", "N/A")
             servicio = row.get("servicio", "N/A")
             direccion = row.get("direccion", "N/A")
@@ -89,7 +94,7 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
             requisitos = row.get("requisitos", "N/A")
             notas = row.get("notas", "")
 
-            lines.append(f"Organización: {org} | Servicio: {servicio} | Dirección: {direccion} | Teléfono: {telefono} | Requisitos: {requisitos} | Notas: {notas}")
+            lines.append(f"id: {id_val}|Organization: {org} | Service: {servicio} | Address: {direccion} | Telephone: {telefono} | Requirements: {requisitos} | Notas: {notas}")
 
         return "\n".join(lines)
 
@@ -277,3 +282,71 @@ def get_map_resources(city: str = "Valencia", category: str | None = None) -> li
     except Exception as e:
         logger.error(f"[tools] Error en get_map_resources: {e}")
         return []
+    
+def get_distances(user_position: tuple, branch_ids: list[int]) -> str:
+    """
+    Calculate the distance and driving time between the user's location 
+    and each indicated branch, using OSRM (OpenStreetMap routing).
+
+    Args:
+        user_position: Tuple (latitude, longitude) of the user.
+        branch_ids: List of branch IDs to query.
+
+    Returns:
+        JSON string with a list of objects: 
+        [{"branch_id": int, "distance_km": float, "duration_min": float}, ...] 
+        or an error message if something fails.
+    """
+
+    if not user_position or len(user_position) < 2:
+        return "ERROR: user_position inválida."
+    if not branch_ids:
+        return "ERROR: No se proporcionaron IDs de sucursales."
+
+    lat_orig, lon_orig = float(user_position[0]), float(user_position[1])
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        placeholders = ", ".join(["?"] * len(branch_ids))
+        rows = conn.execute(
+            f"SELECT id, latitude AS lat, longitude AS lon FROM branches WHERE id IN ({placeholders})",
+            branch_ids,
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error consultando la base de datos para distancias: {e}")
+        return f"ERROR al consultar BD: {e}"
+
+    if not rows:
+        logger.warning("No se encontraron sucursales con esos IDs.")
+        return "ERROR: No se encontraron sucursales con esos IDs."
+
+    # --- Calcular rutas con OSRM ---
+    results = []
+    for row in rows:
+        bid, lat_dst, lon_dst = int(row["id"]), float(row["lat"]), float(row["lon"])
+        coords = f"{lon_orig},{lat_orig};{lon_dst},{lat_dst}"
+        try:
+            resp = _requests.get(
+                f"{_OSRM_BASE}{coords}",
+                params={"overview": "false"},   #sin geometría → respuesta ligera
+                timeout=8,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("code") == "Ok":
+                route = data["routes"][0]
+                results.append({
+                    "branch_id":    bid,
+                    "distance_km": round(route["distance"] / 1000, 2),
+                    "duration_min": round(route["duration"] / 60, 1),
+                })
+            else:
+                results.append({"branch_id": bid, "error": data.get("code", "OSRM error")})
+        except Exception as e:
+            logger.error(f"Error consultando OSRM para sucursal {bid}: {e}")
+            results.append({"branch_id": bid, "error": str(e)})
+
+    logger.info(f"Distancias calculadas para {len(results)} sucursales.")
+    return json.dumps(results, ensure_ascii=False)

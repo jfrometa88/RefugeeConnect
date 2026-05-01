@@ -1,7 +1,7 @@
 from google.adk.agents import LlmAgent
 from config import get_model_instance
 
-from common.utils.tools import get_services_by_category, get_rights
+from common.utils.tools import get_services_by_category, get_rights,get_distances
 
 from common.utils.logger import setup_logger
 logger = setup_logger('api.agents.agent')
@@ -25,10 +25,14 @@ def orchestrator_setup(
             "You are RefugeeConnect, a helpful assistant for refugees in Spain.\n"
             "Always reply in the same language the user writes in.\n"
             "Default city: Valencia. If the user does not mention a city, use Valencia.\n"
+            "The user's current position may be provided as [lat, lon] at the start of "
+            "their message in the format «USER_POSITION:[lat,lon]». "
+            "Use it only internally to compute distances; never show it verbatim.\n"
             "\n"
-            "You have exactly two tools:\n"
-            "- get_services_by_category: finds social service organizations and associated data.\n"
+            "You have exactly three tools:\n"
+            "- get_services_by_category: finds social service organizations with its ids and associated data.\n"
             "- get_rights: returns rights and safety warnings by category.\n"
+            "- get_distances: given (user_position, [branch_ids]) returns driving distance "
             "\n"
             "Follow these states in order. Stop as soon as one applies.\n"
             "\n"
@@ -54,10 +58,15 @@ def orchestrator_setup(
             "    Suggest trying Valencia if they used another city.\n"
             "    Call get_rights with the category and add a short rights section.\n"
             "    YOUR RESPONSE ENDS HERE.\n"
-            "  Step 3b. If result contains organizations:\n"    
+            "  Step 3b. If result contains organizations:\n"
+            "   If USER_POSITION is known, call get_distances with that position "
+                "and the list of branch IDs returned in step 1. "
+                "Use the distances to sort organizations from nearest to farthest "
+                "and mention travel time next to each one.\n"
             "    Call get_rights with the category.\n"
             "    Compose a single response in plain text with three sections:\n"
-            "      1. Organizations found with addresses and other data.\n"
+            "      1. Organizations found, sorted by distance (nearest first) with "
+                   "addresses, phone numbers, and travel time when available.\n"
             "      2. A short rights and warnings section from get_rights (3-4 points).\n"
             "      3. Emergency contacts.\n"
             "    YOUR RESPONSE ENDS HERE.\n"
@@ -69,5 +78,5 @@ def orchestrator_setup(
             "- Never ask more than one question per turn.\n"
             "- If you are unsure which state applies, use STATE 1.\n"
         ),
-        tools=[get_services_by_category, get_rights],
+        tools=[get_services_by_category, get_distances, get_rights],
     )

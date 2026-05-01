@@ -19,6 +19,8 @@ load_dotenv()
 DEFAULT_CLOUD_MODEL = os.getenv("GEMMA_MODEL_NAME_cloud", "gemma-4-31b-it")
 GEMMA4_MODEL_NAME = os.getenv("GEMMA4_MODEL_NAME","gemma4:e2b")
 
+MOCK_USER_POSITION = (39.4697, -0.3774)
+
 current_dir = Path(__file__).resolve().parent
 project_root = current_dir.parent
 if str(project_root) not in sys.path:
@@ -229,6 +231,27 @@ def build_marker(resource: dict) -> dl.CircleMarker:
        id={"type": "map-marker", "index": f"{resource['id']}-{resource['lat']}-{resource['lon']}"},
     )
 
+def build_user_marker() -> dl.CircleMarker:
+    """Marcador que representa la posición simulada del usuario."""
+    lat, lon = MOCK_USER_POSITION
+
+    return dl.Marker(
+        position=[lat, lon],
+        children=[
+              dl.Tooltip("📍 Tu ubicación (simulada)", sticky=True),
+              dl.Popup(
+                  html.Div([
+                      html.B("📍 Tu posición actual (simulada)"),
+                      html.Br(),
+                      html.Small(f"Lat: {lat}  |  Lon: {lon}",
+                                 style={"color": "#666"}),
+                  ], style={"fontSize": "0.9em"})
+              ),
+        ],
+        id="user-position-marker",
+    )
+
+
 def make_bubble(text: str, role: str) -> dbc.Card:
     """Crea un mensaje de chat con estilo de burbuja"""
     is_user = role == "user"
@@ -251,6 +274,7 @@ initial_resources = fetch_map_resources_local()
 initial_health = fetch_system_health()
 
 #App
+
 app = dash.Dash(
     __name__,
     external_stylesheets=[
@@ -540,7 +564,7 @@ def update_map_markers(category_clicks, all_clicks, refresh_clicks, active_categ
 
     
     resources = fetch_map_resources_local(category=new_category)
-    markers = [build_marker(r) for r in resources]
+    markers = [build_user_marker()] + [build_marker(r) for r in resources]
 
     count_text = (
         f"{len(resources)} sedes encontradas"
@@ -596,7 +620,11 @@ def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
     try:
         resp = requests.post(
             f"{API_BASE}/query",
-            json={"message": user_text, "session_id": session_id, "user_id": "anonymous_user"},
+            json={"message": user_text, 
+                  "session_id": session_id, 
+                  "user_id": "anonymous_user",
+                  "user_position": list(MOCK_USER_POSITION),
+                  },
             timeout=180,
         )
         resp.raise_for_status()

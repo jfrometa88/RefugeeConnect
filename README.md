@@ -44,8 +44,8 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  User Interface (Dash)               │
-│           Multilingual: ES | EN | AR | FR            │
+│                  User Interface (Dash)              │
+│           Multilingual: ES | EN | AR | FR           │
 └──────────────────┬──────────────────────────────────┘
                    │
        ┌───────────┴───────────┐
@@ -82,7 +82,9 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 - **Safe Tool Design** — Tools return standardized strings (e.g., `NO_RECORDS`) to prevent hallucination loops in smaller local models
 - **Resilient by Design** — The map interface works independently of the LLM; users always get *something* useful
 - **Dual-Use Potential** — Useful not just for migrants, but also for NGO volunteers who need quick guidance themselves
-
+- **Improved Responsiveness** - Input Blocking: The text input and send button are automatically disabled during AI processing using Dash's 
+running parameter to prevent duplicate messages. Added a chat-status-bar with an "Assistant is thinking..." text to provide clear feedback during latency.
+- **Proximity-Aware Results** — A simulated user position is shown on the map as an icon; the assistant calculates driving distance and estimated travel time to each organization found, sorting results nearest-first.
 ---
 
 ## 🏗️ Technology Stack
@@ -92,6 +94,7 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 | Model (Cloud) | Gemma 4 (31B) via Google AI Studio |
 | Model (Local) | Gemma 4 (E2B/E4B) via Ollama & LiteLLM |
 | Agent Framework | Google ADK (Agent Development Kit) |
+| Routing & Distances | OSRM (Open Source Routing Machine) via router.project-osrm.org |
 | Backend API | FastAPI (Asynchronous) |
 | Frontend | Plotly Dash & Dash Leaflet (OpenStreetMap) |
 | Database | SQLite |
@@ -111,18 +114,20 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 │                                              │
 │ GREETING → PROFILE_CHECK → QUERY_PARSE       │
 │       → RESOURCE_SEARCH → RESPONSE           │
-└──────────────┬───────────────────────────────┘
-               │
-    ┌──────────┼──────────┐
-    ▼                     ▼
-[get_services]       [get_rigths]
-   tool                  tool
+└────────────────────┬─────────────────────────┘
+                     │
+    ┌────────────────┬────────────────┐
+    ▼                ▼                ▼
+[get_services] [get_rights]    [get_distances]
+   tool           tool              tool
 ```
 
 **Key design decisions:**
 - State-based reasoning prevents ambiguous or looping responses
 - Tools return normalized strings, not raw objects
 - The map bypasses the LLM entirely for resilience and speed
+- Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
+- State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
 
 ---
 
@@ -210,6 +215,10 @@ This project is a **functional proof of concept**, not a finished product. These
 - **Database coverage:** A representative sample of local NGOs — not exhaustive
 - **Translation:** The AI translates responses dynamically, but static dashboard labels returned from database are not yet translated (a known technical debt)
 - **Local model testing:** Hardware limitations prevented testing with Gemma 4 locally; development used `qwen` as a proxy model via Ollama
+- **Session Management:** Currently lacks adequate session handling; interactions are treated in a volatile context suitable for demo purposes
+- **Memory Optimization:** Relies on InMemoryService for session memory, which carries risks of data loss and high RAM consumption under load
+- **Flow Optimization:** Further testing is required to optimize how the system handles deep LLM data flow errors to prevent frontend freezes during catastrophic API failures
+- **User position:** Currently based on a fixed mock coordinate (Plaza del Ayuntamiento, Valencia). Real geolocation via browser API or manual input is planned but not yet implemented.
 
 The goal is to demonstrate **viability and impact** — to show what's possible, and invite the organizations, institutions, and developers who have the resources to take it further.
 
@@ -223,6 +232,8 @@ The concept is extensible in multiple directions:
 - **Population scope** — The same architecture serves homeless individuals, people with addictions, elderly without support, and children at risk (most NGOs already serve these groups)
 - **Dual use** — A tool not just for people in need, but for NGO volunteers who need quick answers when helping others
 - **Data partnerships** — Formal collaboration with organizations to keep the database current and comprehensive
+- **Vector Database Integration (RAG):** - Transitioning from pure SQLite queries to a Retrieval-Augmented Generation (RAG) architecture using vector databases to handle complex legal texts more efficiently in resource-constrained environments
+- **Real geolocation** — Replace the mock position with browser-based or user-provided coordinates for genuinely personalized proximity routing
 
 ---
 
@@ -241,8 +252,8 @@ This project is submitted to the **Gemma 4 Good Hackathon** under:
 
 This project was built from personal necessity, with a personal computer and personal experience. It is submitted with the hope that it reaches people who can give it the resources it deserves.
 
-- **Kaggle:** [@YOUR_KAGGLE_USER]
-- **LinkedIn:** [Your Profile]
+- **Kaggle:** [@jorgefrometa]
+- **LinkedIn:** [www.linkedin.com/in/jorge-israel-frometa-moya]
 
 ---
 
