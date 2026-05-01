@@ -128,6 +128,8 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 - The map bypasses the LLM entirely for resilience and speed
 - Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
 - State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
+- Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
+- State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
 
 ---
 
@@ -143,8 +145,8 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 ### Quick Start with Docker
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RefugeeConnectAI.git
-cd RefugeeConnectAI
+git clone https://github.com/jfrometa88/RefugeeConnect.git
+cd RefugeeConnect
 docker-compose up --build
 ```
 
@@ -254,6 +256,8 @@ This project was built from personal necessity, with a personal computer and per
 
 - **Kaggle:** [@jorgefrometa]
 - **LinkedIn:** [www.linkedin.com/in/jorge-israel-frometa-moya]
+- **HuggingFace Space** [https://jfrometa88-refugeeconnect-ai-dashboard.hf.space/]
+- **Youtube** [https://youtu.be/bGfg34VjevE]
 
 ---
 
@@ -263,9 +267,3 @@ This project was built from personal necessity, with a personal computer and per
 - **Google** — for the Agent Development Kit (ADK)
 - **Cruz Roja, Cáritas, ACCEM, and all NGOs in Spain** — for the work they do every day under difficult conditions.
 - **Everyone who shared their story** — the people I met navigating the same system, whose experiences shaped every design decision here
-
----
-
-## 📄 License
-
-[MIT License](LICENSE)
