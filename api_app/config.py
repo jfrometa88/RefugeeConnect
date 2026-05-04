@@ -1,12 +1,36 @@
 import os
 import httpx
 from common.utils.logger import setup_logger
+import logging
 from dotenv import load_dotenv
 from google.genai import types
 from google.adk.models import Gemini
-from google.adk.models.lite_llm import LiteLlm 
+from google.adk.models.lite_llm import LiteLlm
+import litellm
 
-logger = setup_logger('refugee_ai.config')
+
+logger = setup_logger('api.config')
+
+
+# 1. Configurar un manejador de archivos específico para LiteLLM
+lite_llm_file_handler = logging.FileHandler('litellm.log', encoding='utf-8')
+lite_llm_file_handler.setLevel(logging.DEBUG)
+
+# 2. Crear un formato para identificar los eventos fácilmente
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+lite_llm_file_handler.setFormatter(formatter)
+
+# 3. Obtener el logger de LiteLLM y añadirle el manejador
+llm_logger = logging.getLogger('LiteLLM')
+llm_logger.addHandler(lite_llm_file_handler)
+llm_logger.setLevel(logging.DEBUG)
+
+# 4. OPCIONAL: Evitar que los logs de LiteLLM suban al logger raíz (sistema)
+# Si pones esto en False, NO saldrán por la consola, solo irán al archivo .log
+llm_logger.propagate = False
+
+# Activar el debug (esto hará que LiteLLM empiece a enviar datos al logger que acabamos de configurar)
+litellm._turn_on_debug()
 load_dotenv()
 
 GEMMA_MODEL_NAME_local=os.getenv("GEMMA_MODEL_NAME_local", "qwen2.5-coder:3b")
@@ -74,7 +98,12 @@ def get_model_instance(agent_role: str = "general",
             )
             #limpiamos el modelo de prefijo ollama:
             model_clean = model_name_local.replace("ollama:", "")
-            return LiteLlm(model=f"ollama_chat/{model_clean}")
+            return LiteLlm(model=f"ollama_chat/{model_clean}",
+                           temperature=0.1,
+                           num_ctx=8192,
+                           num_predict=512,
+                           repeat_penalty=1.2
+                            )
         else:
             #intentamos obtener la api key 
             google_api_key = os.getenv('GEMINI_API_KEY')

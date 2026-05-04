@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     global agent_manager
     logger.info("Inicializando RefugeeAgentManager...")
     try:
-        agent_manager = RefugeeAgentManager(            
+        agent_manager = RefugeeAgentManager(
             model_name_cloud=GEMMA_MODEL_NAME_cloud,
             model_name_local=GEMMA_MODEL_NAME_local,
             is_local=USE_LOCAL_LLM,
@@ -254,11 +254,13 @@ async def query_agent(query: AgentQuery):
 
         session_id_usado = query.session_id or f"session_{query.user_id}"
 
-        return AgentResponse(
+        respuesta_agente = AgentResponse(
             response=response,
             status="success",
             session_id=session_id_usado,
         )
+
+        return respuesta_agente
 
     except Exception as e:
         logger.error(f"Error procesando consulta [user={query.user_id}]: {e}", exc_info=True)

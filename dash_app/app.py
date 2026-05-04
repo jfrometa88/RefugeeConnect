@@ -739,7 +739,7 @@ def toggle_backend_mode(switch_value, selected_local_model):
     health = fetch_system_health()
     alert = check_gemma4_in_ollama(health)
 
-    if use_local and not health.get("ollama_available", False):
+    if use_local and not (health.get("ollama_available", False) and selected_local_model):
         warning_msg = dbc.Alert(
             "⚠️ Please check Ollama is running and select a Gemma 4 model/يرجى التحقق من أن Ollama يعمل واختر نموذج Gemma 4/Veuillez vérifier qu'Ollama fonctionne et sélectionner un modèle Gemma 4",
             color="warning",

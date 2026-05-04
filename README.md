@@ -82,9 +82,10 @@ RefugeeConnect AI addresses these barriers through two complementary access mode
 - **Safe Tool Design** — Tools return standardized strings (e.g., `NO_RECORDS`) to prevent hallucination loops in smaller local models
 - **Resilient by Design** — The map interface works independently of the LLM; users always get *something* useful
 - **Dual-Use Potential** — Useful not just for migrants, but also for NGO volunteers who need quick guidance themselves
-- **Improved Responsiveness** - Input Blocking: The text input and send button are automatically disabled during AI processing using Dash's 
-running parameter to prevent duplicate messages. Added a chat-status-bar with an "Assistant is thinking..." text to provide clear feedback during latency.
-- **Proximity-Aware Results** — A simulated user position is shown on the map as an icon; the assistant calculates driving distance and estimated travel time to each organization found, sorting results nearest-first.
+- **Improved Responsiveness** — Input blocking during AI processing prevents duplicate messages; a status bar provides clear feedback during latency
+- **Proximity-Aware Results** — A simulated user position is shown on the map as an icon; the assistant calculates driving distance and estimated travel time to each organization found, sorting results nearest-first
+- **SLM-Optimized Orchestration** — Dedicated prompt strategy and consolidated tool architecture for Gemma 4's smaller local variants (E2B/E4B), enabling reliable deployment even on constrained hardware
+
 ---
 
 ## 🏗️ Technology Stack
@@ -126,10 +127,28 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 - State-based reasoning prevents ambiguous or looping responses
 - Tools return normalized strings, not raw objects
 - The map bypasses the LLM entirely for resilience and speed
-- Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
-- State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
-- Error Handling & API Resilience: Robust Retry Logic: The system handles 500 INTERNAL errors from the Google GenAI API by leveraging google-adk's automatic retries.
-- State Persistence: The Orchestrator Agent maintains conversational state across API failures, ensuring the "thought process" is not lost even if the backend experiences temporary instability.
+- **Error Handling & API Resilience:** Robust retry logic handles 500 INTERNAL errors from the Google GenAI API via `google-adk`'s automatic retries; the Orchestrator maintains conversational state across API failures
+- **Dynamic Prompting:** `config.py` detects the deployment environment (Cloud vs. Local) and serves specialized instruction sets — full-reasoning prompts for 31B, simplified Chain-of-Thought prompts for 2B/4B variants
+
+---
+
+## 🔬 Technical Pivot: Optimizing for Local SLMs (Gemma E2B/E4B)
+
+Initial development was validated using `qwen` via Ollama as a functional proxy due to hardware limitations. Testing on a more capable machine with Gemma 4's smaller local variants revealed new challenges that required dedicated engineering work.
+
+### The Cognitive Load Problem
+While the 31B cloud model handled multiple specialized tools seamlessly, the E2B and E4B variants suffered from **attention drift** — entering repetitive tool-calling cycles without progressing. The solution was consolidating from three separate tools into a **single unified tool for local deployment**, drastically reducing the model's decision surface and improving reliability on conditional logic branches.
+
+### Recency Bias as a Control Mechanism
+Smaller models frequently lost track of System Prompt constraints once the context window filled with raw tool output. Rather than fighting this tendency, the architecture was redesigned to **leverage it**: strict control instructions (e.g., *"Data received. Now summarize and stop."*) are injected directly at the end of each tool's response. Placing directives at the point of highest model attention — the most recent tokens — proved far more reliable than relying on distant system prompt constraints.
+
+### Differentiated Prompting Strategy
+Prompt engineering that works for 31B models is often too verbose or nuanced for 2B variants. A **dynamic prompting strategy** was implemented: `config.py` detects the deployment environment and serves specialized instruction sets. Local prompts were stripped of ambiguity and restructured around explicit Chain-of-Thought triggers to prevent hallucinations and loops.
+
+### Observability-Driven Debugging
+Internal loops were opaque until raw ADK–inference engine exchanges were made visible. A dedicated **LiteLLM logging integration** and Ollama debug mode enabled deep-packet analysis of JSON payloads. This revealed that the issue was not hardware-bound: even on high-end GPUs, **Chat Template mismatches** and **absent stop tokens** in model output were the primary culprits, requiring explicit stop token configuration and prompt structure alignment with Gemma's chat template format.
+
+> **Core lesson:** Local AI deployment is not just about quantization — it is about orchestration. Optimizing for Gemma 4's smaller variants required moving beyond standard prompting into active context management and observability-driven development.
 
 ---
 
@@ -145,8 +164,8 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 ### Quick Start with Docker
 
 ```bash
-git clone https://github.com/jfrometa88/RefugeeConnect.git
-cd RefugeeConnect
+git clone https://github.com/jfrometa88/RefugeeConnectAI.git
+cd RefugeeConnectAI
 docker-compose up --build
 ```
 
@@ -192,7 +211,7 @@ refugeeconnect-ai/
 │   │   ├── agent_manager.py        # AI architecture configuration
 │   │   ├── agent.py                # Agent setup
 │   │   └── tracing_plugin.py       # AI trace configuration
-│   ├── config.py                   # Model & inference mode config
+│   ├── config.py                   # Model & inference mode config (Cloud/Local detection)
 │   ├── Dockerfile.api
 │   └── requirements.txt
 │
@@ -215,12 +234,12 @@ This project is a **functional proof of concept**, not a finished product. These
 
 - **Geographic scope:** Limited to Valencia (where I live and have personal experience)
 - **Database coverage:** A representative sample of local NGOs — not exhaustive
-- **Translation:** The AI translates responses dynamically, but static dashboard labels returned from database are not yet translated (a known technical debt)
-- **Local model testing:** Hardware limitations prevented testing with Gemma 4 locally; development used `qwen` as a proxy model via Ollama
+- **Translation:** The AI translates responses dynamically, but static dashboard labels returned from the database are not yet translated (a known technical debt)
+- **Local model testing:** Initial development used `qwen` as a proxy model via Ollama due to hardware limitations; Gemma E2B/E4B were subsequently tested and the architecture was adapted accordingly (see [Technical Pivot](#-technical-pivot-optimizing-for-local-slms-gemma-e2be4b))
 - **Session Management:** Currently lacks adequate session handling; interactions are treated in a volatile context suitable for demo purposes
-- **Memory Optimization:** Relies on InMemoryService for session memory, which carries risks of data loss and high RAM consumption under load
-- **Flow Optimization:** Further testing is required to optimize how the system handles deep LLM data flow errors to prevent frontend freezes during catastrophic API failures
-- **User position:** Currently based on a fixed mock coordinate (Plaza del Ayuntamiento, Valencia). Real geolocation via browser API or manual input is planned but not yet implemented.
+- **Memory Optimization:** Relies on `InMemoryService` for session memory, which carries risks of data loss and high RAM consumption under load
+- **Flow Optimization:** Further testing is required to optimize deep LLM data flow error handling to prevent frontend freezes during catastrophic API failures
+- **User position:** Currently based on a fixed mock coordinate (Plaza del Ayuntamiento, Valencia). Real geolocation via browser API or manual input is planned but not yet implemented
 
 The goal is to demonstrate **viability and impact** — to show what's possible, and invite the organizations, institutions, and developers who have the resources to take it further.
 
@@ -234,8 +253,9 @@ The concept is extensible in multiple directions:
 - **Population scope** — The same architecture serves homeless individuals, people with addictions, elderly without support, and children at risk (most NGOs already serve these groups)
 - **Dual use** — A tool not just for people in need, but for NGO volunteers who need quick answers when helping others
 - **Data partnerships** — Formal collaboration with organizations to keep the database current and comprehensive
-- **Vector Database Integration (RAG):** - Transitioning from pure SQLite queries to a Retrieval-Augmented Generation (RAG) architecture using vector databases to handle complex legal texts more efficiently in resource-constrained environments
+- **Vector Database Integration (RAG)** — Transitioning from pure SQLite queries to a Retrieval-Augmented Generation architecture using vector databases to handle complex legal texts more efficiently in resource-constrained environments
 - **Real geolocation** — Replace the mock position with browser-based or user-provided coordinates for genuinely personalized proximity routing
+- **Broader SLM support** — The orchestration patterns developed for Gemma E2B/E4B are applicable to other small local models, enabling deployment on a wider range of NGO hardware
 
 ---
 
@@ -250,14 +270,12 @@ This project is submitted to the **Gemma 4 Good Hackathon** under:
 
 ## 👤 Author
 
-**[Jorge Israel Frometa Moya]** 
+**[Jorge Israel Frometa Moya]**
 
 This project was built from personal necessity, with a personal computer and personal experience. It is submitted with the hope that it reaches people who can give it the resources it deserves.
 
 - **Kaggle:** [@jorgefrometa]
 - **LinkedIn:** [www.linkedin.com/in/jorge-israel-frometa-moya]
-- **HuggingFace Space** [https://jfrometa88-refugeeconnect-ai-dashboard.hf.space/]
-- **Youtube** [https://youtu.be/bGfg34VjevE]
 
 ---
 
@@ -265,5 +283,11 @@ This project was built from personal necessity, with a personal computer and per
 
 - **Google DeepMind** — for the Gemma 4 models and the hackathon opportunity
 - **Google** — for the Agent Development Kit (ADK)
-- **Cruz Roja, Cáritas, ACCEM, and all NGOs in Spain** — for the work they do every day under difficult conditions.
+- **Cruz Roja, Cáritas, ACCEM, and all NGOs in Spain** — for the work they do every day under difficult conditions
 - **Everyone who shared their story** — the people I met navigating the same system, whose experiences shaped every design decision here
+
+---
+
+## 📄 License
+
+[MIT License](LICENSE)

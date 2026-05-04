@@ -7,6 +7,7 @@ import requests as _requests
 
 from .logger import setup_logger
 
+
 logger = setup_logger('tools')
 
 DB_PATH = Path(__file__).resolve().parents[2] / "common" / "data" / "refugeeconnect.db"
@@ -79,10 +80,12 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
         df = pd.read_sql_query(query, conn, params=(category, city))
         conn.close()
 
+        bloque_datos = f"--- DATABASE RESULTS FOR {category.upper()} IN {city.upper()} ---\n"
+
         if df.empty:
             logger.warning(f"No se encontraron recursos de '{category}' en {city}.")
-            return f"NO_RECORDS:{city}:{category}"
-
+            bloque_datos += f"No local services found in {city} for this category {category}.\n"
+            return bloque_datos
         lines = []
 
         for _, row in df.iterrows():
@@ -95,8 +98,22 @@ def get_services_by_category(category: str, city: str = "Valencia") -> str:
             notas = row.get("notas", "")
 
             lines.append(f"id: {id_val}|Organization: {org} | Service: {servicio} | Address: {direccion} | Telephone: {telefono} | Requirements: {requisitos} | Notas: {notas}")
+        
+        # 3. Obtener los derechos legales/sociales
+        rights_raw = get_rights(category=category)
+        rights_dict = json.loads(rights_raw)
 
-        return "\n".join(lines)
+        
+        bloque_datos += "\n".join(lines)
+        
+        derechos = "\n".join([f"- {d}" for d in rights_dict.get("derechos_fundamentales", [])])
+        emergencias = "\n".join([f"- {e}" for e in rights_dict.get("contactos_emergencia", [])])
+
+        # Añadir Derechos y Alertas
+        bloque_datos += f"\n--- LEGAL RIGHTS & ALERTS (IMPORTANT) ---\n{derechos}\n"
+        bloque_datos += f"\n--- EMERGENCY CONTACTS ---\n{emergencias}\n"
+        
+        return bloque_datos
 
     except Exception as e:
         logger.error(f"Error consultando la base de datos: {e}")
@@ -183,10 +200,10 @@ def get_rights(category: str) -> str:
     
     emergency = RIGHTS_SNIPPETS.get("_emergencia", [])
 
-    #bajamos a 3 puntos clave para que el orquestador no se sature con tanta información
+    #bajamos a 2 puntos clave para que el orquestador no se sature con tanta información
     data_response = {
         "categoria_consultada": category,
-        "derechos_fundamentales": rights[:3], 
+        "derechos_fundamentales": rights[:2] if rights else [], 
         "contactos_emergencia": emergency 
     }
     
@@ -350,3 +367,94 @@ def get_distances(user_position: tuple, branch_ids: list[int]) -> str:
 
     logger.info(f"Distancias calculadas para {len(results)} sucursales.")
     return json.dumps(results, ensure_ascii=False)
+
+def get_comprehensive_refugee_help(category: str, city: str, lat: float = None, lon: float = None, language_answer: str = None) -> str:
+    """
+    Gets all the necessary information for a refugee: services, distances (if there is a location) and rights.
+    Use this tool ONLY ONCE when the user indicates their need and their city.
+
+    Args:
+        category (str): REQUIRED. MUST BE EXACTLY ONE OF: "Legal", "Salud", "Alojamiento", "Comida", "Empleo".
+        city (str): REQUIRED. The city name (default "Valencia").
+        lat (float): Optional latitude.
+        lon (float): Optional longitude.
+        language_answer (str): Detected language from the user input in english (without abreviations).
+    """
+
+    if category not in VALID_CATEGORIES:
+        logger.error(f"Categoría '{category}' no válida.")
+        return json.dumps([{
+            "error": f"Invalid category '{category}'. Supported: {', '.join(VALID_CATEGORIES)}"
+        }], ensure_ascii=False)
+
+    try:
+        conn = _get_connection()
+        query = """
+            SELECT            
+                b.id            AS id,
+                o.name          AS organizacion,
+                s.name          AS servicio,
+                s.category      AS categoria,
+                b.address       AS direccion,
+                b.local_phone   AS telefono,
+                bs.requirements AS requisitos,
+                bs.notes        AS notas
+            FROM branches b
+            JOIN organizations o ON b.organization_id = o.id
+            JOIN branch_services bs ON b.id = bs.branch_id
+            JOIN services s ON bs.service_id = s.id
+            WHERE s.category = ? AND b.city = ?
+            ORDER BY o.name
+            LIMIT 2
+        """
+        df = pd.read_sql_query(query, conn, params=(category, city))
+        conn.close()
+        
+        rights_raw = get_rights(category=category)
+        rights_dict = json.loads(rights_raw)
+        
+        derechos = "\n".join([f"- {d}" for d in rights_dict.get("derechos_fundamentales", [])])
+        emergencias = "\n".join([f"- {e}" for e in rights_dict.get("contactos_emergencia", [])])
+
+        # Construcción del cuerpo de datos
+        bloque_datos = f"--- DATABASE RESULTS FOR {category.upper()} IN {city.upper()} ---\n"
+        
+        if df.empty:
+            bloque_datos += f"No local services found in {city} for this category {category}.\n"
+        else:
+            ids = []
+            for _, row in df.iterrows():
+                bloque_datos += (f"ID: {row['id']} | Org: {row['organizacion']} | Service: {row['servicio']} | "
+                                f"Address: {row['direccion']} | Phone: {row['telefono']} | "
+                                f"Req: {row['requisitos']} | Notes: {row['notas']}\n")
+                ids.append(row['id'])
+            
+            if lat is not None and lon is not None:
+                distances_data = get_distances(user_position=(lat, lon), branch_ids=ids)
+                bloque_datos += f"\n[DISTANCES INFO]: {distances_data}\n"
+
+        # Añadir Derechos y Alertas
+        bloque_datos += f"\n--- LEGAL RIGHTS & ALERTS (IMPORTANT) ---\n{derechos}\n"
+        bloque_datos += f"\n--- EMERGENCY CONTACTS ---\n{emergencias}\n"
+        
+        instrucciones_control = f"""
+            --- CRITICAL INSTRUCTIONS FOR THE MODEL ---
+            1. You have RECEIVED all the data. Do NOT call 'get_comprehensive_refugee_help' again.
+            2. Summarize the services, distances, and rights provided above.
+            3. Translate and write your final response in: {language_answer}.
+            4. Be empathetic and clear. 
+            5. STOP after this response. No more tool calls are needed.
+            """
+        respuesta_final = bloque_datos + instrucciones_control
+
+        logger.info(f"Devolviendo {len(respuesta_final)} caracteres con instrucciones de control.")
+        return respuesta_final
+
+    except Exception as e:
+        logger.error(f"Error consultando: {e}")
+        return "Error 500: No se pudo procesar la solicitud de información."
+
+
+if __name__== "__main__":
+    resp = get_comprehensive_refugee_help(category="Legal",city="Valencia",lat= 39.4697, lon= -0.3774)
+    print(f"test:{resp}")
