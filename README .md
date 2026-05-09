@@ -223,6 +223,7 @@ refugeeconnect-ai/
 ├── docker-compose.yml
 ├── pyproject.toml
 └── uv.lock
+└── litellm.log                     # Logs for interaction with Ollama
 ```
 
 ---
