@@ -132,23 +132,21 @@ The system evolved from an **Orchestrator → Multi-Agent → Tool Specialist** 
 
 ---
 
-## 🔬 Technical Pivot: Optimizing for Local SLMs (Gemma E2B/E4B)
+## 🔬 Technical Pivot: Optimizing for Local SLMs (Gemma 4B/2B)
 
-Initial development was validated using `qwen` via Ollama as a functional proxy due to hardware limitations. Testing on a more capable machine with Gemma 4's smaller local variants revealed new challenges that required dedicated engineering work.
+**Initial development was validated using Qwen via Ollama due to personal hardware limitations.** While occasionally tested on a more capable machine with Gemma 4's smaller local variants (2B and 4B via Ollama), significant new challenges emerged that required a dedicated engineering response.
 
-### The Cognitive Load Problem
-While the 31B cloud model handled multiple specialized tools seamlessly, the E2B and E4B variants suffered from **attention drift** — entering repetitive tool-calling cycles without progressing. The solution was consolidating from three separate tools into a **single unified tool for local deployment**, drastically reducing the model's decision surface and improving reliability on conditional logic branches.
+While the 31B cloud model handled multiple specialized tools seamlessly, the 2B and 4B variants suffered from attention drift, entering repetitive tool-calling cycles without progressing. The root cause was excessive orchestration complexity for smaller context windows. The solution was consolidating from three separate tools into a single unified tool for local deployment, drastically reducing the model's decision surface.
 
-### Recency Bias as a Control Mechanism
-Smaller models frequently lost track of System Prompt constraints once the context window filled with raw tool output. Rather than fighting this tendency, the architecture was redesigned to **leverage it**: strict control instructions (e.g., *"Data received. Now summarize and stop."*) are injected directly at the end of each tool's response. Placing directives at the point of highest model attention — the most recent tokens — proved far more reliable than relying on distant system prompt constraints.
+**Smaller models frequently lost track of System Prompt constraints** once the context window filled with raw tool output. This caused state loss and infinite loops. Rather than fighting this tendency, the architecture was redesigned to leverage it: strict control instructions ("Data received. Now summarize and stop.") and reminder of user language were injected directly at the end of each tool's response. Placing directives at the point of highest model attention — the most recent tokens — proved far more reliable than relying on distant system prompt constraints.
 
-### Differentiated Prompting Strategy
-Prompt engineering that works for 31B models is often too verbose or nuanced for 2B variants. A **dynamic prompting strategy** was implemented: `config.py` detects the deployment environment and serves specialized instruction sets. Local prompts were stripped of ambiguity and restructured around explicit Chain-of-Thought triggers to prevent hallucinations and loops.
+**Differentiated prompting strategy.** Prompt engineering that works for 31B models is often too verbose or nuanced for 2B variants. A dynamic prompting strategy was implemented: now detects the deployment environment (Local vs. Cloud) and serves specialized instruction sets. Local prompts were simplified, trying to to prevent hallucinations and loops.
 
-### Observability-Driven Debugging
-Internal loops were opaque until raw ADK–inference engine exchanges were made visible. A dedicated **LiteLLM logging integration** and Ollama debug mode enabled deep-packet analysis of JSON payloads. This revealed that the issue was not hardware-bound: even on high-end GPUs, **Chat Template mismatches** and **absent stop tokens** in model output were the primary culprits, requiring explicit stop token configuration and prompt structure alignment with Gemma's chat template format.
+**Observability-driven debugging.** Internal loops were opaque until raw ADK–inference engine exchanges were made visible. A dedicated LiteLLM logging integration and Ollama debug mode were used to perform deep-packet analysis of JSON payloads. This revealed a layered set of root causes: Chat Template mismatches, absent stop tokens, and — critically — a payload-level incompatibility where LiteLLM serializes tool results with role: "tool" while Gemma's chat template expects role: "tool_responses". Since modifying library internals is not portable, a targeted monkey-patch was implemented at the _get_completion_inputs boundary, intercepting the assembled message list and rewriting the role field only for affected models, without replicating any internal logic. This fix applies transparently at startup with no changes to deployment dependencies.
 
-> **Core lesson:** Local AI deployment is not just about quantization — it is about orchestration. Optimizing for Gemma 4's smaller variants required moving beyond standard prompting into active context management and observability-driven development.
+**Inference Parameter Tuning for Local SLMs.** Reliable local deployment required explicit inference configuration beyond prompt engineering. For Gemma 2B/4B via Ollama: temperature=0.1 enforces near-deterministic instruction-following; num_ctx=8192 prevents silent context truncation — Ollama's default of 4k tokens caused the system prompt to be dropped as tool outputs filled the window.
+
+This experience reinforced a core lesson: local AI deployment is not just about quantization — it is about orchestration. Optimizing for Gemma 4's smaller variants required moving beyond standard prompting into active context management, payload-level compatibility engineering, and observability-driven development.
 
 ---
 
@@ -164,7 +162,7 @@ Internal loops were opaque until raw ADK–inference engine exchanges were made 
 ### Quick Start with Docker
 
 ```bash
-git clone https://github.com/jfrometa88/RefugeeConnectAI.git
+git clone https://github.com/jfrometa88/RefugeeConnect.git
 cd RefugeeConnectAI
 docker-compose up --build
 ```
@@ -185,7 +183,7 @@ uv sync
 uv run python api_app/IA_api.py
 
 # In a separate terminal, start the frontend
-uv run python dash_app/app_code.py
+uv run python dash_app/app.py
 ```
 
 ---
@@ -212,6 +210,7 @@ refugeeconnect-ai/
 │   │   ├── agent.py                # Agent setup
 │   │   └── tracing_plugin.py       # AI trace configuration
 │   ├── config.py                   # Model & inference mode config (Cloud/Local detection)
+│   ├── litellm_gemma_patch.py      # Patch to change tool response payload to gemma4 in Ollama
 │   ├── Dockerfile.api
 │   └── requirements.txt
 │
@@ -235,7 +234,7 @@ This project is a **functional proof of concept**, not a finished product. These
 - **Geographic scope:** Limited to Valencia (where I live and have personal experience)
 - **Database coverage:** A representative sample of local NGOs — not exhaustive
 - **Translation:** The AI translates responses dynamically, but static dashboard labels returned from the database are not yet translated (a known technical debt)
-- **Local model testing:** Initial development used `qwen` as a proxy model via Ollama due to hardware limitations; Gemma E2B/E4B were subsequently tested and the architecture was adapted accordingly (see [Technical Pivot](#-technical-pivot-optimizing-for-local-slms-gemma-e2be4b))
+- **Local model testing:** Initial development used `qwen` as a proxy model via Ollama due to hardware limitations; Gemma E2B/E4B were subsequently tested and the architecture was adapted accordingly.
 - **Session Management:** Currently lacks adequate session handling; interactions are treated in a volatile context suitable for demo purposes
 - **Memory Optimization:** Relies on `InMemoryService` for session memory, which carries risks of data loss and high RAM consumption under load
 - **Flow Optimization:** Further testing is required to optimize deep LLM data flow error handling to prevent frontend freezes during catastrophic API failures
@@ -285,9 +284,3 @@ This project was built from personal necessity, with a personal computer and per
 - **Google** — for the Agent Development Kit (ADK)
 - **Cruz Roja, Cáritas, ACCEM, and all NGOs in Spain** — for the work they do every day under difficult conditions
 - **Everyone who shared their story** — the people I met navigating the same system, whose experiences shaped every design decision here
-
----
-
-## 📄 License
-
-[MIT License](LICENSE)

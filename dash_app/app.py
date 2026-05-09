@@ -618,12 +618,14 @@ def handle_chat(n_clicks, n_submit, user_text, chat_history, session_id):
             chat_history = []
     
     try:
+        lat, lon = MOCK_USER_POSITION
+
         resp = requests.post(
             f"{API_BASE}/query",
             json={"message": user_text, 
                   "session_id": session_id, 
                   "user_id": "anonymous_user",
-                  "user_position": list(MOCK_USER_POSITION),
+                  "user_position": [lat,lon],
                   },
             timeout=180,
         )
@@ -739,7 +741,7 @@ def toggle_backend_mode(switch_value, selected_local_model):
     health = fetch_system_health()
     alert = check_gemma4_in_ollama(health)
 
-    if use_local and not (health.get("ollama_available", False) and selected_local_model):
+    if use_local and not (health.get("ollama_available", False) and (selected_local_model is None or selected_local_model!= [""])):
         warning_msg = dbc.Alert(
             "⚠️ Please check Ollama is running and select a Gemma 4 model/يرجى التحقق من أن Ollama يعمل واختر نموذج Gemma 4/Veuillez vérifier qu'Ollama fonctionne et sélectionner un modèle Gemma 4",
             color="warning",

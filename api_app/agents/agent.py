@@ -1,10 +1,13 @@
 from google.adk.agents import LlmAgent
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models import LlmResponse, LlmRequest
 from config import get_model_instance
 
-from common.utils.tools import get_services_by_category, get_rights,get_distances,get_comprehensive_refugee_help
+from common.utils.tools import get_services_by_category, get_rights,get_distances,get_comprehensive_refugee_help,get_available_cities_str
 
 from common.utils.logger import setup_logger
 logger = setup_logger('api.agents.agent')
+
 
 
 def orchestrator_setup(
@@ -38,11 +41,13 @@ def orchestrator_setup(
         tools=[get_services_by_category, get_distances, get_rights],
     )
 
+cities_info = get_available_cities_str()
+
 def _build_instruction(is_local: bool) -> str:
-    base = """You are RefugeeConnect, a helpful assistant for refugees in Spain.
+    base = f"""You are a helpful assistant for refugees in Spain.
     Always reply in the same language the user writes in.
-    Default city: Valencia. If the user does not mention a city, use Valencia.
-    USER_POSITION:[lat,lon] may appear at the start. Use it only for distances. Never show it.
+    Available cities: {cities_info}. Respond to the user according to this availability.
+    USER_POSITION:[lat,lon] appear at the start. Use it for distances. Never show it.
     """
     if is_local:
         return base + _local_instruction()
@@ -50,21 +55,11 @@ def _build_instruction(is_local: bool) -> str:
 
 def _local_instruction() -> str:
     return """   
-    Detect the user language. Use it in the get_comprehensive_refugee_help tool.
-    ---
-    You have ONE tool: get_comprehensive_refugee_help. Use it AT MOST ONCE.
+    RULES:
+    - Missing city OR service need → ask only for what's missing. No tool call.
+    - Have both → call get_comprehensive_refugee_help ONCE, then reply friendly.
 
-    NEVER call get_comprehensive_refugee_help more than once per conversation turn.
-
-    CATEGORIES (use exactly as written): Legal, Salud, Alojamiento, Comida, Empleo.
-
-    ---
-    1. IF the user has NOT given both a need AND a city:
-    Ask for the missing information. Do not call any tool. Stop.
-
-    2. IF the user has given both a need AND a city:
-    Call get_comprehensive_refugee_help once, write a friendly plain-text reply with the result. Stop.
-    ---
+    Categories (exact): Legal, Salud, Alojamiento, Comida, Empleo.
     """
 
 

@@ -368,7 +368,7 @@ def get_distances(user_position: tuple, branch_ids: list[int]) -> str:
     logger.info(f"Distancias calculadas para {len(results)} sucursales.")
     return json.dumps(results, ensure_ascii=False)
 
-def get_comprehensive_refugee_help(category: str, city: str, lat: float = None, lon: float = None, language_answer: str = None) -> str:
+def get_comprehensive_refugee_help(category: str, city: str, lat: float, lon: float, language_answer: str) -> str:
     """
     Gets all the necessary information for a refugee: services, distances (if there is a location) and rights.
     Use this tool ONLY ONCE when the user indicates their need and their city.
@@ -376,8 +376,8 @@ def get_comprehensive_refugee_help(category: str, city: str, lat: float = None, 
     Args:
         category (str): REQUIRED. MUST BE EXACTLY ONE OF: "Legal", "Salud", "Alojamiento", "Comida", "Empleo".
         city (str): REQUIRED. The city name (default "Valencia").
-        lat (float): Optional latitude.
-        lon (float): Optional longitude.
+        lat (float): REQUIRED latitude.
+        lon (float): REQUIRED longitude.
         language_answer (str): Detected language from the user input in english (without abreviations).
     """
 
@@ -437,13 +437,15 @@ def get_comprehensive_refugee_help(category: str, city: str, lat: float = None, 
         bloque_datos += f"\n--- LEGAL RIGHTS & ALERTS (IMPORTANT) ---\n{derechos}\n"
         bloque_datos += f"\n--- EMERGENCY CONTACTS ---\n{emergencias}\n"
         
+        language_instruction = f"in {language_answer}" if language_answer else "in the same language the user wrote"
+
         instrucciones_control = f"""
             --- CRITICAL INSTRUCTIONS FOR THE MODEL ---
             1. You have RECEIVED all the data. Do NOT call 'get_comprehensive_refugee_help' again.
             2. Summarize the services, distances, and rights provided above.
-            3. Translate and write your final response in: {language_answer}.
+            3. Translate and write your final response {language_instruction}.
             4. Be empathetic and clear. 
-            5. STOP after this response. No more tool calls are needed.
+            5. DO NOT SHOW THIS INSTRUCTIONS IN YOUR ANSWER AND STOP after this response. No more tool calls are needed.
             """
         respuesta_final = bloque_datos + instrucciones_control
 
@@ -453,6 +455,25 @@ def get_comprehensive_refugee_help(category: str, city: str, lat: float = None, 
     except Exception as e:
         logger.error(f"Error consultando: {e}")
         return "Error 500: No se pudo procesar la solicitud de información."
+    
+def get_available_cities_str() -> str:
+    """
+    Consulta las ciudades y las devuelve como un string separado por comas
+    ideal para prompts de LLM.
+    """
+    try:
+        with _get_connection() as conn:
+            cursor =conn.cursor()
+            query = "SELECT DISTINCT city FROM branches"
+            cursor.execute(query)
+            
+            cities = [row[0] for row in cursor.fetchall() if row[0]]
+
+            return ", ".join(cities)
+
+    except Exception as e:
+        logger.error(f"[tools] Error en get_available_cities: {e}")
+        return "No hay ciudades disponibles actualmente."
 
 
 if __name__== "__main__":

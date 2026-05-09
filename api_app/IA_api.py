@@ -19,6 +19,9 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from common.utils.logger import setup_logger
+
+import litellm_gemma_patch
+
 from agents.agent_manager import RefugeeAgentManager
 from agents.tracing_plugin import tracing_plugin
 from config import check_backend_availability
@@ -242,7 +245,7 @@ async def query_agent(query: AgentQuery):
 
         if query.user_position and len(query.user_position) == 2:
             lat, lon = query.user_position
-            message = f"USER_POSITION:[{lat},{lon}] {query.message}"
+            message = f"USER_POSITION:[lat:{lat},long:{lon}] {query.message}"
         else:
             message = query.message
 
@@ -309,7 +312,7 @@ async def toggle_model_mode(config: SystemConfig):
             model_name_cloud=config.model_name_cloud,
             model_name_local=config.model_name_local
         )
-        logger.info(f"Actualización exitosa a modo local: {str(config.use_local)} y modelo local {config.model_name_cloud} y cloud {config.model_name_local}")
+        logger.info(f"Actualización exitosa a modo local: {str(config.use_local)} y modelo local {config.model_name_local} y cloud {config.model_name_cloud}")
         runtime_config.use_local_llm = config.use_local
         return {"status": "success", "mode_agent": "local" if config.use_local else "cloud", "mode_orc": "local" if config.use_local else "cloud"}
     except Exception as e:

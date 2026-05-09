@@ -9,6 +9,7 @@ from google.adk.models.lite_llm import LiteLlm
 import litellm
 
 
+
 logger = setup_logger('api.config')
 
 
@@ -45,6 +46,8 @@ RETRY_CONFIG = types.HttpRetryOptions(
 )
 
 
+
+
 def check_backend_availability(is_local: bool) -> bool:
     """
     Verifica si el backend de inferencia seleccionado está disponible.
@@ -76,6 +79,7 @@ def check_backend_availability(is_local: bool) -> bool:
             logger.error("GEMINI_API_KEY no configurada o inválida.")
             return False
         return True
+    
 
 def get_model_instance(agent_role: str = "general",
                        model_name_cloud: str = None,
@@ -90,7 +94,6 @@ def get_model_instance(agent_role: str = "general",
     try:
         if USE_LOCAL_LLM:
             ollama_host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
-            os.environ['OLLAMA_API_BASE'] = ollama_host
 
             logger.info(
                 f"[{agent_role}] Inicializando MODO LOCAL (Ollama) "
@@ -99,10 +102,11 @@ def get_model_instance(agent_role: str = "general",
             #limpiamos el modelo de prefijo ollama:
             model_clean = model_name_local.replace("ollama:", "")
             return LiteLlm(model=f"ollama_chat/{model_clean}",
+                           api_base=ollama_host,
                            temperature=0.1,
                            num_ctx=8192,
                            num_predict=512,
-                           repeat_penalty=1.2
+                           repeat_penalty=1.1
                             )
         else:
             #intentamos obtener la api key 
